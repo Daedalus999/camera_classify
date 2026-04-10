@@ -36,11 +36,6 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# build artifacts
-*.apk
-*.aab
-*.ipa
-
 # generated native folders
 /ios
 /android

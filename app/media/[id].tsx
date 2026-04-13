@@ -216,11 +216,11 @@ export default function MediaViewerScreen() {
               <Text style={styles.editLabel}>标题（可选）</Text>
               <TextInput
                 style={styles.editInput}
-                placeholder="最多10个字"
+                placeholder="最多20个字"
                 placeholderTextColor={Colors.textTertiary}
                 value={editTitle}
-                onChangeText={(t) => setEditTitle(t.slice(0, 10))}
-                maxLength={10}
+                onChangeText={(t) => setEditTitle(t.slice(0, 20))}
+                maxLength={20}
                 returnKeyType="done"
               />
 

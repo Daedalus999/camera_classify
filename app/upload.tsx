@@ -190,11 +190,11 @@ export default function UploadScreen() {
       <Text style={styles.sectionLabel}>标题（可选）</Text>
       <TextInput
         style={styles.titleInput}
-        placeholder="最多10个字"
+        placeholder="最多20个字"
         placeholderTextColor={Colors.textTertiary}
         value={title}
-        onChangeText={(t) => setTitle(t.slice(0, 10))}
-        maxLength={10}
+        onChangeText={(t) => setTitle(t.slice(0, 20))}
+        maxLength={20}
         returnKeyType="done"
       />
 

@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { clearAllData } from '../../src/db/database';
 import { Colors, Spacing, FontSize, BorderRadius } from '../../src/constants/theme';
+
+const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
 export default function SettingsScreen() {
   const [showClearModal, setShowClearModal] = useState(false);
@@ -29,7 +32,7 @@ export default function SettingsScreen() {
           <Ionicons name="camera" size={40} color={Colors.primary} />
         </View>
         <Text style={styles.appName}>ClimbSnap</Text>
-        <Text style={styles.appVersion}>v1.0.0</Text>
+        <Text style={styles.appVersion}>v{appVersion}</Text>
         <Text style={styles.appDesc}>攀岩照片/视频分类管理</Text>
       </View>
 

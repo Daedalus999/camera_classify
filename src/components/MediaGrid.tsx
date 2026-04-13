@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import {
   View,
   FlatList,
@@ -6,11 +6,15 @@ import {
   StyleSheet,
   Dimensions,
   Text,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { MediaItem } from '../types';
 import { Colors, BorderRadius, Spacing, FontSize } from '../constants/theme';
+import { renameMediaGroup } from '../db/database';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const NUM_COLUMNS = 3;
@@ -21,6 +25,7 @@ interface MediaGridProps {
   items: MediaItem[];
   onItemPress: (item: MediaItem, index: number) => void;
   onLongPress?: (item: MediaItem) => void;
+  onGroupRenamed?: () => void;
   ListHeaderComponent?: React.ReactElement;
   ListEmptyComponent?: React.ReactElement;
   /** When false, renders as a plain View instead of FlatList (for nesting inside SectionList). */
@@ -76,11 +81,16 @@ export default function MediaGrid({
   items,
   onItemPress,
   onLongPress,
+  onGroupRenamed,
   ListHeaderComponent,
   ListEmptyComponent,
   scrollable = true,
 }: MediaGridProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [renameModal, setRenameModal] = useState<{ visible: boolean; oldTitle: string }>({ visible: false, oldTitle: '' });
+  const [renameText, setRenameText] = useState('');
+  const [saving, setSaving] = useState(false);
+  const renameInputRef = useRef<TextInput>(null);
 
   const toggleGroup = useCallback((title: string) => {
     setExpandedGroups(prev => {
@@ -90,6 +100,38 @@ export default function MediaGrid({
       return next;
     });
   }, []);
+
+  const openRename = useCallback((title: string) => {
+    setRenameText(title);
+    setRenameModal({ visible: true, oldTitle: title });
+    setTimeout(() => renameInputRef.current?.focus(), 100);
+  }, []);
+
+  const handleRename = useCallback(async () => {
+    const newTitle = renameText.trim();
+    if (!newTitle || newTitle === renameModal.oldTitle) {
+      setRenameModal({ visible: false, oldTitle: '' });
+      return;
+    }
+    setSaving(true);
+    try {
+      await renameMediaGroup(renameModal.oldTitle, newTitle);
+      setExpandedGroups(prev => {
+        const next = new Set(prev);
+        if (next.has(renameModal.oldTitle)) {
+          next.delete(renameModal.oldTitle);
+          next.add(newTitle);
+        }
+        return next;
+      });
+      setRenameModal({ visible: false, oldTitle: '' });
+      onGroupRenamed?.();
+    } catch (e: any) {
+      Alert.alert('重命名失败', e?.message ?? String(e));
+    } finally {
+      setSaving(false);
+    }
+  }, [renameText, renameModal.oldTitle, onGroupRenamed]);
 
   const { grouped, ungrouped } = useMemo(() => groupByTitle(items), [items]);
 
@@ -161,6 +203,7 @@ export default function MediaGrid({
         <Pressable
           style={({ pressed }) => [styles.groupHeader, pressed && styles.groupHeaderPressed]}
           onPress={() => toggleGroup(row.title)}
+          onLongPress={() => openRename(row.title)}
         >
           <View style={styles.groupHeaderLeft}>
             <Ionicons
@@ -170,9 +213,18 @@ export default function MediaGrid({
             />
             <Text style={styles.groupTitle} numberOfLines={1}>{row.title}</Text>
           </View>
-          <View style={styles.groupBadge}>
-            <Ionicons name="layers" size={12} color={Colors.primary} />
-            <Text style={styles.groupCount}>{row.count}</Text>
+          <View style={styles.groupHeaderRight}>
+            <Pressable
+              style={styles.renameBtn}
+              onPress={() => openRename(row.title)}
+              hitSlop={8}
+            >
+              <Ionicons name="pencil" size={14} color={Colors.textTertiary} />
+            </Pressable>
+            <View style={styles.groupBadge}>
+              <Ionicons name="layers" size={12} color={Colors.primary} />
+              <Text style={styles.groupCount}>{row.count}</Text>
+            </View>
           </View>
         </Pressable>
       );
@@ -191,6 +243,41 @@ export default function MediaGrid({
 
   const keyExtractor = (_: GridRow, index: number) => String(index);
 
+  const renameModalElement = (
+    <Modal visible={renameModal.visible} transparent animationType="fade">
+      <Pressable style={styles.modalOverlay} onPress={() => setRenameModal({ visible: false, oldTitle: '' })}>
+        <Pressable style={styles.modalBox} onPress={() => {}}>
+          <Text style={styles.modalTitle}>重命名子集合</Text>
+          <TextInput
+            ref={renameInputRef}
+            style={styles.renameInput}
+            value={renameText}
+            onChangeText={(t) => setRenameText(t.slice(0, 20))}
+            maxLength={20}
+            placeholder="输入新名称"
+            placeholderTextColor={Colors.textTertiary}
+            autoFocus
+          />
+          <View style={styles.modalActions}>
+            <Pressable
+              style={({ pressed }) => [styles.modalBtn, styles.modalBtnCancel, pressed && styles.pressed]}
+              onPress={() => setRenameModal({ visible: false, oldTitle: '' })}
+            >
+              <Text style={styles.modalBtnCancelText}>取消</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.modalBtn, styles.modalBtnConfirm, pressed && styles.pressed]}
+              onPress={handleRename}
+              disabled={saving}
+            >
+              <Text style={styles.modalBtnConfirmText}>{saving ? '保存中...' : '确定'}</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+
   if (!scrollable) {
     return (
       <View style={styles.container}>
@@ -199,20 +286,24 @@ export default function MediaGrid({
           : rows.map((row, i) => (
               <React.Fragment key={i}>{renderRow({ item: row })}</React.Fragment>
             ))}
+        {renameModalElement}
       </View>
     );
   }
 
   return (
-    <FlatList
-      data={rows}
-      renderItem={renderRow}
-      keyExtractor={keyExtractor}
-      contentContainerStyle={styles.container}
-      ListHeaderComponent={ListHeaderComponent}
-      ListEmptyComponent={ListEmptyComponent}
-      showsVerticalScrollIndicator={false}
-    />
+    <>
+      <FlatList
+        data={rows}
+        renderItem={renderRow}
+        keyExtractor={keyExtractor}
+        contentContainerStyle={styles.container}
+        ListHeaderComponent={ListHeaderComponent}
+        ListEmptyComponent={ListEmptyComponent}
+        showsVerticalScrollIndicator={false}
+      />
+      {renameModalElement}
+    </>
   );
 }
 
@@ -321,6 +412,14 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     flex: 1,
   },
+  groupHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  renameBtn: {
+    padding: 4,
+  },
   groupTitle: {
     fontSize: FontSize.sm,
     fontWeight: '700',
@@ -340,5 +439,60 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: '700',
     color: Colors.primary,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.overlay,
+  },
+  modalBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xxl,
+    width: 320,
+    maxWidth: '90%',
+  },
+  modalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: Spacing.lg,
+    textAlign: 'center',
+  },
+  renameInput: {
+    backgroundColor: Colors.surfaceVariant,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: FontSize.md,
+    color: Colors.text,
+    marginBottom: Spacing.lg,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+  },
+  modalBtnCancel: {
+    backgroundColor: Colors.surfaceVariant,
+  },
+  modalBtnConfirm: {
+    backgroundColor: Colors.primary,
+  },
+  modalBtnCancelText: {
+    fontSize: FontSize.md,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  modalBtnConfirmText: {
+    fontSize: FontSize.md,
+    fontWeight: '600',
+    color: Colors.white,
   },
 });

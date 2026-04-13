@@ -93,7 +93,7 @@ export default function MonthDetailScreen() {
           </Pressable>
         )}
         renderItem={({ item: dateItems }) => (
-          <MediaGrid items={dateItems} onItemPress={handleItemPress} />
+          <MediaGrid items={dateItems} onItemPress={handleItemPress} onGroupRenamed={refresh} />
         )}
         ListEmptyComponent={
           loading ? undefined : (

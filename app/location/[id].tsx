@@ -83,6 +83,7 @@ export default function LocationDetailScreen() {
         <MediaGrid
           items={items}
           onItemPress={handleItemPress}
+          onGroupRenamed={refresh}
           ListHeaderComponent={header}
           ListEmptyComponent={empty}
         />

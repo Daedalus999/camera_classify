@@ -362,6 +362,28 @@ export async function updateMediaItem(
   );
 }
 
+export async function renameMediaGroup(oldTitle: string, newTitle: string): Promise<void> {
+  const trimmedNew = newTitle.trim() || null;
+  const trimmedOld = oldTitle.trim();
+  if (!trimmedOld || trimmedNew === trimmedOld) return;
+
+  if (isWeb) {
+    const store = loadWebDB();
+    for (const m of store.mediaItems) {
+      if ((m as any).title === trimmedOld) {
+        (m as any).title = trimmedNew;
+      }
+    }
+    saveWebDB(store);
+    return;
+  }
+  const db = await getNativeDatabase();
+  await db.runAsync(
+    'UPDATE media_items SET title = ? WHERE title = ?',
+    trimmedNew, trimmedOld
+  );
+}
+
 export async function deleteMediaItem(id: number): Promise<void> {
   if (isWeb) {
     const store = loadWebDB();

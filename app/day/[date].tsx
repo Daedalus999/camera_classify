@@ -96,6 +96,7 @@ export default function DayDetailScreen() {
       <MediaGrid
         items={items}
         onItemPress={handleItemPress}
+        onGroupRenamed={refresh}
         ListHeaderComponent={header}
         ListEmptyComponent={loading ? undefined : empty}
       />
